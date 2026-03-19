@@ -350,10 +350,13 @@ class TestDataMsgHandlers(tm.TestCase):
         self.assertTablesEqual(f, s, sortby=SORT_KEYS)
 
     def test_json(self):
+        import io
         df = self.table.to_frame()
         jsondf = df.to_json()
 
-        dmh = swat.datamsghandlers.JSON(jsondf)
+        # Pandas 3 no longer supports passing a json text string.
+        # You must pass a file path or object with a read method
+        dmh = swat.datamsghandlers.JSON(io.StringIO(jsondf))
 
         tbl = self.s.addtable(table='cars', **dmh.args.addtable).casTable
 

@@ -1162,13 +1162,16 @@ class TestCASTable(tm.TestCase):
         self.assertEqual(desc.loc['freq'].tolist(), dfdesc.loc['freq'].tolist())
 
         # Percentiles
+        # Pandas < 3 always includes percentile 0.5 even if you don't ask for it
+        # Starting with Pandas 3, percentile 0.5 is not included unless you ask for it
+        # CASTable always includes 0.5, regardless of pandas version.
         desc = self.table.describe(percentiles=[0.3, 0.7])
-        dfdesc = df.describe(percentiles=[0.3, 0.7])
+        dfdesc = df.describe(percentiles=[0.3, 0.5, 0.7])
         self.assertEqual(desc.index.tolist(), dfdesc.index.tolist())
         self.assertEqual(desc.columns.tolist(), dfdesc.columns.tolist())
 
         desc = self.table.describe(percentiles=0.4)
-        dfdesc = df.describe(percentiles=[0.4])
+        dfdesc = df.describe(percentiles=[0.4, 0.5])
         self.assertEqual(desc.index.tolist(), dfdesc.index.tolist())
         self.assertEqual(desc.columns.tolist(), dfdesc.columns.tolist())
 
@@ -1536,17 +1539,39 @@ class TestCASTable(tm.TestCase):
         tblgrp = tbl[['Make', 'Type']].groupby(['Make'])
 
         # TODO: Pandas mode sets columns with all unique values to NaN
-        self.assertEqual(
-            dfgrp.get_group('Acura').mode()[['Type']].to_csv(index=False),
-            tblgrp.mode().loc['Acura', ['Type']].dropna(how='all').to_csv(index=False))
+        if pd_version >= (2, 2, 0):
+            # Syntax Change in pandas 3.
+            # Future Warning in Pandas 2.2+
+            # When grouping with a length-1 list-like,
+            # you will need to pass a length-1 tuple to get_group
+            self.assertEqual(
+                dfgrp.get_group(('Acura',)).mode()[['Type']].to_csv(index=False),
+                tblgrp.mode().loc['Acura', ['Type']].dropna(how='all')
+                .to_csv(index=False))
+        else:
+            self.assertEqual(
+                dfgrp.get_group('Acura').mode()[['Type']].to_csv(index=False),
+                tblgrp.mode().loc['Acura', ['Type']].dropna(how='all')
+                .to_csv(index=False))
 
         dfgrp = df[['Cylinders', 'MPG_City']].groupby(['Cylinders'])
         tblgrp = tbl[['Cylinders', 'MPG_City']].groupby(['Cylinders'])
 
         # TODO: Pandas mode sets columns with all unique values to NaN
-        self.assertEqual(
-            dfgrp.get_group(6.0).mode()[['MPG_City']].to_csv(index=False),
-            tblgrp.mode().loc[6.0, ['MPG_City']].dropna(how='all').to_csv(index=False))
+        if pd_version >= (2, 2, 0):
+            # Syntax Change in pandas 3.
+            # Future Warning in Pandas 2.2+
+            # When grouping with a length-1 list-like,
+            # you will need to pass a length-1 tuple to get_group
+            self.assertEqual(
+                dfgrp.get_group((6.0,)).mode()[['MPG_City']].to_csv(index=False),
+                tblgrp.mode().loc[6.0, ['MPG_City']].dropna(how='all')
+                .to_csv(index=False))
+        else:
+            self.assertEqual(
+                dfgrp.get_group(6.0).mode()[['MPG_City']].to_csv(index=False),
+                tblgrp.mode().loc[6.0, ['MPG_City']].dropna(how='all')
+                .to_csv(index=False))
 
     def test_median(self):
         df = self.get_cars_df()
@@ -4652,7 +4677,9 @@ class TestCASTable(tm.TestCase):
 
         html = tbl.to_html(index=False)
 
-        df2 = pd.read_html(html)[0]
+        # Starting with Pandas 3 you can no longer
+        # pass an html string to pandas read_html.
+        df2 = pd.read_html(io.StringIO(html))[0]
 
         df['Model'] = df['Model'].str.strip()
 
