@@ -112,8 +112,17 @@ class TestByGroups(tm.TestCase):
             a = a.sort_values(sortby)
             b = b.sort_values(sortby)
         self.assertEqual(list(a.columns), list(b.columns))
-        a = a.fillna(value=fillna)
-        b = b.fillna(value=fillna)
+
+        if pd_version >= (2, 2, 0) and pd_version < (3, 0, 0):
+            # fix 2.2 and 2.3 FutureWarning:
+            #  Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated
+            with pd.option_context('future.no_silent_downcasting', True):
+                a = a.fillna(value=fillna)
+                b = b.fillna(value=fillna)
+        else:
+            a = a.fillna(value=fillna)
+            b = b.fillna(value=fillna)
+
         for lista, listb in zip(list(a.to_records(index=include_index)),
                                 list(b.to_records(index=include_index))):
             lista = list(lista)
@@ -701,7 +710,8 @@ class TestByGroups(tm.TestCase):
                                sortby=['Origin', 'EngineSize'])
 
     @unittest.skipIf(pd_version < (0, 16, 0), 'Need newer version of Pandas')
-    @unittest.skipIf(pd_version >= (1, 0, 0), 'Raises AssertionError in Pandas 1')
+    @unittest.skipIf(pd_version >= (1, 0, 0) and pd_version < (2, 0, 0),
+                     'Raises AssertionError in Pandas 1')
     def test_max(self):
         df = self.get_cars_df().sort_values(SORT_KEYS)
         tbl = self.table.sort_values(SORT_KEYS)

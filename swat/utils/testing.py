@@ -37,6 +37,8 @@ UUID_RE = r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$'
 
 RE_TYPE = type(re.compile(r''))
 
+pd_version = tuple([int(x) for x in re.match(r'^(\d+)\.(\d+)\.(\d+)',
+                                             pd.__version__).groups()])
 
 warnings.filterwarnings('ignore', category=OptionWarning)
 warnings.filterwarnings('ignore', category=RuntimeWarning)
@@ -93,8 +95,17 @@ class TestCase(unittest.TestCase):
             a = a.sort_values(sortby, na_position='first')
             b = b.sort_values(sortby, na_position='first')
         self.assertEqual(list(a.columns), list(b.columns))
-        a = a.fillna(value=fillna)
-        b = b.fillna(value=fillna)
+
+        if pd_version >= (2, 2, 0) and pd_version < (3, 0, 0):
+            # fix 2.2 and 2.3 FutureWarning:
+            # Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated
+            with pd.option_context('future.no_silent_downcasting', True):
+                a = a.fillna(value=fillna)
+                b = b.fillna(value=fillna)
+        else:
+            a = a.fillna(value=fillna)
+            b = b.fillna(value=fillna)
+
         if precision is not None:
             a = a.round(decimals=precision)
             b = b.round(decimals=precision)
@@ -108,8 +119,17 @@ class TestCase(unittest.TestCase):
             a = a.to_series()
         if hasattr(b, 'to_series'):
             b = b.to_series()
-        a = a.fillna(value=fillna)
-        b = b.fillna(value=fillna)
+
+        if pd_version >= (2, 2, 0) and pd_version < (3, 0, 0):
+            # fix 2.2 and 2.3 FutureWarning:
+            # Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated
+            with pd.option_context('future.no_silent_downcasting', True):
+                a = a.fillna(value=fillna)
+                b = b.fillna(value=fillna)
+        else:
+            a = a.fillna(value=fillna)
+            b = b.fillna(value=fillna)
+
         if precision is not None:
             a = a.round(decimals=precision)
             b = b.round(decimals=precision)
